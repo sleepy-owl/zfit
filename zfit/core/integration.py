@@ -100,8 +100,14 @@ def mc_integrate(func: Callable, limits: ztyping.LimitsType, axes: Optional[ztyp
 
     else:
         # TODO: deal with n_obs properly?
-
+        # global cached_var1
+        # if cached_var1 is None:
         samples_normed = mc_sampler(dim=n_axes, num_results=n_samples, dtype=dtype)
+        cached_var1 = tf.get_variable('cached_var1' + str(np.random.randint(100000, 100000000)),
+                                      initializer=samples_normed)
+        zfit.run(cached_var1.initializer)
+        samples_normed = cached_var1
+
         samples_normed = tf.reshape(samples_normed, shape=(n_vals, int(n_samples / n_vals), n_axes))
         samples = samples_normed * (upper - lower) + lower  # samples is [0, 1], stretch it
         samples = tf.transpose(samples, perm=[2, 0, 1])
