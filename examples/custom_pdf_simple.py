@@ -1,12 +1,12 @@
 import zfit
+
 from zfit import ztf
 
 
 class CustomPDF(zfit.pdf.ZPDF):
-    """1-dimensional PDF implementing the exp(alpha * x) shape."""
-    _PARAMS = ['alpha']  # specify which parameters to take
+    _PARAMS = ['alpha']
 
-    def _unnormalized_pdf(self, x):  # implement function
+    def _unnormalized_pdf(self, x):
         data = x.unstack_x()
         alpha = self.params['alpha']
 
@@ -14,7 +14,6 @@ class CustomPDF(zfit.pdf.ZPDF):
 
 
 obs = zfit.Space("obs1", limits=(-4, 4))
-
 custom_pdf = CustomPDF(obs=obs, alpha=0.2)
 
 integral = custom_pdf.integrate(limits=(-1, 2))
