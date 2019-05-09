@@ -1,3 +1,5 @@
+#  Copyright (c) 2019 zfit
+
 import contextlib
 import copy
 import multiprocessing
@@ -34,6 +36,10 @@ class RunManager:
         self.chunking.active = False  # not yet implemented the chunking...
         self.chunking.max_n_points = 1000000
 
+        # session run arguments
+        self.run_metadata = None
+        self.run_options = None
+
     def auto_initialize(self, variable: tf.Variable):
         self(variable.initializer)
 
@@ -54,8 +60,8 @@ class RunManager:
                 cpu = sorted(os.sched_getaffinity(0))
             except AttributeError:
                 cpu = range(multiprocessing.cpu_count())
-                warnings.warn("Not running on Linux. Determining available cpus for thread can fail"
-                              "and be overestimated. Workaround (only if too many cpus are used):"
+                warnings.warn("Not running on Linux. Determining available cpus for thread can fail "
+                              "and be overestimated. Workaround (only if too many cpus are used): "
                               "`zfit.run.set_n_cpu(your_cpu_number)`")
         elif isinstance(n_cpu, int):
             cpu = range(n_cpu)
@@ -78,7 +84,10 @@ class RunManager:
             self._cpu.extend(cpu)
 
     def __call__(self, *args, **kwargs):
-        return self.sess.run(*args, **kwargs)
+        run_options = kwargs.pop("options", self.run_options)
+        run_metadata = kwargs.pop("run_metadata", self.run_metadata)
+
+        return self.sess.run(*args, options=run_options, run_metadata=run_metadata, **kwargs)
 
     # def close(self):
     #     """Closes the current session."""

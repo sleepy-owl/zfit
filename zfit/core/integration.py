@@ -70,6 +70,7 @@ def mc_integrate(func: Callable, limits: ztyping.LimitsType, axes: Optional[ztyp
     Returns:
         numerical: the integral
     """
+    print(mc_sampler)
     if axes is not None and n_axes is not None:
         raise ValueError("Either specify axes or n_axes")
     limits = convert_to_space(limits)

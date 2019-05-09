@@ -59,6 +59,9 @@ def _BaseModel_register_check_support(has_support: bool):
     return register
 
 
+import numpy as np
+
+
 class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
     """Base class for any generic model.
 
@@ -71,6 +74,8 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
     _DEFAULTS_integration.mc_sampler = lambda dim, num_results, dtype: tf.random_uniform(maxval=1.,
                                                                                          shape=(num_results, dim),
                                                                                          dtype=dtype)
+
+    _DEFAULTS_integration.mc_sampler = lambda dim, num_results, dtype: np.random.uniform(size=(num_results, dim))
     _DEFAULTS_integration.draws_per_dim = 80000
     _DEFAULTS_integration.auto_numeric_integrator = zintegrate.auto_integrate
 

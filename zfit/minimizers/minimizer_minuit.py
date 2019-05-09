@@ -9,6 +9,7 @@ import numpy as np
 import texttable as tt
 import tensorflow as tf
 
+import zfit
 from zfit.core.interfaces import ZfitLoss
 from .fitresult import FitResult
 from ..util.cache import Cachable
@@ -28,7 +29,7 @@ class MinuitMinimizer(BaseMinimizer, Cachable):
             strategy (): A :py:class:`~zfit.minimizer.baseminimizer.ZfitStrategy` object that defines the behavior of
             the minimizer in certain situations.
             minimize_strategy (): A number used by minuit to define the strategy
-            tolerance (): Internal numerical tolerance
+            tolerance (): Internal numerical toletf.printrance
             verbosity (): Regulates how much will be printed during minimization. Values between 0 and 10 are valid.
             name (): Name of the minimizer
             ncall (): Maximum number of minimization steps.
@@ -98,7 +99,9 @@ class MinuitMinimizer(BaseMinimizer, Cachable):
                     table.add_row([param.name, value])
                 print(table.draw())
 
-            loss_evaluated = self.sess.run(loss_val)
+            # loss_evaluated = self.sess.run(loss_val)
+            import zfit
+            loss_evaluated = zfit.run(loss_val)
             if np.isnan(loss_evaluated):
                 self.strategy.minimize_nan(loss=loss, minimizer=self, loss_value=loss_evaluated, params=params)
             return loss_evaluated
@@ -113,7 +116,7 @@ class MinuitMinimizer(BaseMinimizer, Cachable):
                     table.add_row([param.name, value])
                 print(table.draw())
 
-            gradients_values = self.sess.run(gradients)
+            gradients_values = zfit.run(gradients)
             if any(np.isnan(gradients_values)):
                 self.strategy.minimize_nan(loss=loss, minimizer=self, gradient_values=gradients_values, params=params)
             return gradients_values
@@ -128,34 +131,6 @@ class MinuitMinimizer(BaseMinimizer, Cachable):
                                                    # forced_parameters=[f"param_{i}" for i in range(len(start_values))],
                                                    **minimizer_init)
 
-        """
-        error_limit_kwargs = {}
-        param_lower_upper_step = tuple(
-            (param, param.lower_limit, param.upper_limit, param.step_size)
-            for param in params)
-        param_lower_upper_step = self.sess.run(param_lower_upper_step)
-        for param, (value, low, up, step) in zip(params, param_lower_upper_step):
-            param_kwargs = {}
-            param_kwargs[param.name] = value
-            param_kwargs['limit_' + param.name] = low, up
-            param_kwargs['error_' + param.name] = step
-
-            error_limit_kwargs.update(param_kwargs)
-        params_name = [param.name for param in params]
-
-        overlapping_kwargs = frozenset(error_limit_kwargs.keys()).intersection(minimizer_init.keys())
-        if overlapping_kwargs:
-            raise ValueError("The following `minimizer_init` arguments are defined internally and are invalid: "
-                             "{}".format(overlapping_kwargs))
-        error_limit_kwargs.update(minimizer_init)
-
-        # if self._minuit_minimizer is None:
-        minimizer = iminuit.Minuit(fcn=func, use_array_call=True,
-                                   grad=grad_func,
-                                   forced_parameters=params_name,
-                                   print_level=self.verbosity,
-                                   **error_limit_kwargs)
-        """
         strategy = minimizer_setter.pop('strategy')
         minimizer.set_strategy(strategy)
         assert not minimizer_setter, "minimizer_setter is not empty, bug. Please report. minimizer_setter:".format(
