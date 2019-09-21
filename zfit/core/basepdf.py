@@ -132,12 +132,6 @@ class BasePDF(ZfitPDF, BaseModel):
 
         return space
 
-    def _check_input_norm_range(self, norm_range, caller_name="", none_is_error=True):
-        if norm_range is None:
-            norm_range = self.norm_range
-        return super()._check_input_norm_range(norm_range=norm_range, caller_name=caller_name,
-                                               none_is_error=none_is_error)
-
     def _check_input_params(self, *params):
         return tuple(convert_to_parameter(p) for p in params)
 

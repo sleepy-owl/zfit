@@ -4,15 +4,9 @@ TODO(Mayou36): subclassing?
 """
 #  Copyright (c) 2019 zfit
 
-import abc
 import typing
 
-import tensorflow as tf
-
-
-
 import zfit
-from zfit.util.exception import ShapeIncompatibleError
 from .basemodel import BaseModel
 from .interfaces import ZfitFunc
 from ..settings import ztypes
@@ -41,39 +35,6 @@ class BaseFunc(BaseModel, ZfitFunc):
     def gradients(self, x: ztyping.XType, norm_range: ztyping.LimitsType = None, params: ztyping.ParamsTypeOpt = None):
         # TODO(Mayou36): well, really needed... this gradient?
         raise NotImplementedError("What do you need? Use tf.gradient...")
-
-    @abc.abstractmethod
-    def _func(self, x):
-        raise NotImplementedError
-
-    def func(self, x: ztyping.XType, name: str = "value") -> ztyping.XType:
-        """The function evaluated at `x`.
-
-        Args:
-            x (`Data`):
-            name (str):
-
-        Returns:
-            tf.Tensor:  # TODO(Mayou36): or dataset? Update: rather not, what would obs be?
-        """
-        with self._convert_sort_x(x) as x:
-            return self._single_hook_value(x=x, name=name)
-
-    def _single_hook_value(self, x, name):
-        return self._hook_value(x, name)
-
-    def _hook_value(self, x, name='_hook_value'):
-        return self._call_value(x=x, name=name)
-
-    def _call_value(self, x, name):
-        with self._name_scope(name, values=[x]):
-            try:
-                return self._func(x=x)
-            except ValueError as error:
-                raise ShapeIncompatibleError("Most probably, the number of obs the func was designed for"
-                                             "does not coincide with the `n_obs` from the `space`/`obs`"
-                                             "it received on initialization."
-                                             "Original Error: {}".format(error))
 
     def as_pdf(self) -> "zfit.core.interfaces.ZfitPDF":
         """Create a PDF out of the function

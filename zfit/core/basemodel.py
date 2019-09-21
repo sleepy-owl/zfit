@@ -12,11 +12,12 @@ import warnings
 
 import tensorflow as tf
 
-
 from tensorflow_probability.python import mcmc as mc
 
 from zfit import ztf
 from zfit.core.sample import UniformSampleAndWeights
+from zfit.util import ztyping
+from zfit.util.exception import ShapeIncompatibleError
 from ..core.integration import Integration
 from ..util.cache import Cachable
 from .data import Data, Sampler, SampleData
@@ -234,10 +235,12 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
 
         """
         if norm_range is None or (isinstance(norm_range, Space) and norm_range.limits is None):
-            if none_is_error:
-                raise ValueError("Normalization range `norm_range` has to be specified when calling {name} or"
-                                 "a default normalization range has to be set. Currently, both are None"
-                                 "".format(name=caller_name))
+            norm_range = self.norm_range
+            if norm_range is None:
+                if none_is_error:
+                    raise ValueError("Normalization range `norm_range` has to be specified when calling {name} or"
+                                     "a default normalization range has to be set. Currently, both are None"
+                                     "".format(name=caller_name))
             # else:
             #     norm_range = False
         # if norm_range is False and not convert_false:
@@ -1022,6 +1025,39 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
     def __rmul__(self, other):
         from . import operations
         return operations.multiply(other, self)
+
+    @abc.abstractmethod
+    def _func(self, x):
+        raise NotImplementedError
+
+    def _hook_func(self, x, name='_hook_func'):
+        return self._call_func(x=x, name=name)
+
+    def _single_hook_func(self, x, name):
+        return self._hook_func(x, name)
+
+    def func(self, x: ztyping.XType, name: str = "func") -> ztyping.XType:
+        """The function evaluated at `x`.
+
+        Args:
+            x (`Data`):
+            name (str):
+
+        Returns:
+            tf.Tensor:  # TODO(Mayou36): or dataset? Update: rather not, what would obs be?
+        """
+        with self._convert_sort_x(x) as x:
+            return self._single_hook_func(x=x, name=name)
+
+    def _call_func(self, x, name):
+        with self._name_scope(name, values=[x]):
+            try:
+                return self._func(x=x)
+            except ValueError as error:
+                raise ShapeIncompatibleError("Most probably, the number of obs the func was designed for"
+                                             "does not coincide with the `n_obs` from the `space`/`obs`"
+                                             "it received on initialization."
+                                             "Original Error: {}".format(error))
 
 
 class SimpleModelSubclassMixin:
