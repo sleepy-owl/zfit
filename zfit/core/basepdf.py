@@ -122,7 +122,6 @@ class BasePDF(ZfitPDF, BaseModel):
         cls._subclass_check_support(methods_to_check=_BasePDF_USER_IMPL_METHODS_TO_CHECK,
                                     wrapper_not_overwritten=_BasePDF_register_check_support)
 
-
     def _func_to_integrate(self, x: ztyping.XType):
         return self.unnormalized_pdf(x)
 
@@ -270,7 +269,7 @@ class BasePDF(ZfitPDF, BaseModel):
     def _call_unnormalized_pdf(self, x, name):
         with self._name_scope(name, values=[x]):
             # try:
-                return self._unnormalized_pdf(x)
+            return self._unnormalized_pdf(x)
         # except ValueError as error:
         #     raise ShapeIncompatibleError("Most probably, the number of obs the pdf was designed for"
         #                                  "does not coincide with the `n_obs` from the `space`/`obs`"
