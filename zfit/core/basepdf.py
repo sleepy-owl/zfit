@@ -53,7 +53,7 @@ also the advanced tutorials in `zfit tutorials <https://github.com/zfit/zfit-tut
 
 import abc
 from contextlib import suppress
-from typing import Union, Any, Type, Dict
+from typing import Union, Type, Dict
 import warnings
 
 import tensorflow as tf
@@ -65,9 +65,8 @@ from .interfaces import ZfitPDF, ZfitParameter
 from .limits import Space
 from ..util import ztyping
 from ..util.container import convert_to_container
-from ..util.exception import (AlreadyExtendedPDFError, DueToLazynessNotImplementedError, IntentionNotUnambiguousError,
-                              AlreadyExtendedPDFError,
-                              NormRangeNotSpecifiedError, ShapeIncompatibleError, NotExtendedPDFError, )
+from ..util.exception import (AlreadyExtendedPDFError,
+                              NotExtendedPDFError, )
 from ..util.temporary import TemporarilySet
 from .basemodel import BaseModel
 from .parameter import Parameter, convert_to_parameter
@@ -125,15 +124,12 @@ class BasePDF(ZfitPDF, BaseModel):
 
     @property
     def space(self) -> "zfit.Space":
-        if self._norm_range is not None:
-            space = self._norm_range
-        else:
-            space = super().space
+        # if self._norm_range is not None:
+        #     space = self._norm_range
+        # else:
+        space = super().space
 
         return space
-
-    def _check_input_params(self, *params):
-        return tuple(convert_to_parameter(p) for p in params)
 
     def _func_to_integrate(self, x: ztyping.XType):
         return self.unnormalized_pdf(x)

@@ -15,10 +15,9 @@ import tensorflow as tf
 from tensorflow_probability.python import mcmc as mc
 
 from zfit import ztf
-from zfit.core.sample import UniformSampleAndWeights
-from zfit.util import ztyping
-from zfit.util.exception import ShapeIncompatibleError
+from .sample import UniformSampleAndWeights
 from ..core.integration import Integration
+from .parameter import convert_to_parameter
 from ..util.cache import Cachable
 from .data import Data, Sampler, SampleData
 from .dimension import BaseDimensional
@@ -1058,6 +1057,9 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
                                              "does not coincide with the `n_obs` from the `space`/`obs`"
                                              "it received on initialization."
                                              "Original Error: {}".format(error))
+
+    def _check_input_params(self, *params):
+        return tuple(convert_to_parameter(p) for p in params)
 
 
 class SimpleModelSubclassMixin:
