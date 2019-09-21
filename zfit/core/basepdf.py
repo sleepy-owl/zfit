@@ -122,14 +122,6 @@ class BasePDF(ZfitPDF, BaseModel):
         cls._subclass_check_support(methods_to_check=_BasePDF_USER_IMPL_METHODS_TO_CHECK,
                                     wrapper_not_overwritten=_BasePDF_register_check_support)
 
-    @property
-    def space(self) -> "zfit.Space":
-        # if self._norm_range is not None:
-        #     space = self._norm_range
-        # else:
-        space = super().space
-
-        return space
 
     def _func_to_integrate(self, x: ztyping.XType):
         return self.unnormalized_pdf(x)
