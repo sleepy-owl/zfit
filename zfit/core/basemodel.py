@@ -18,12 +18,13 @@ from zfit import ztf
 from .sample import UniformSampleAndWeights
 from ..core.integration import Integration
 from .parameter import convert_to_parameter
-from ..util.cache import Cachable
+from ..util.cache import Cachable, invalidates_cache
+from ..util.temporary import TemporarilySet
 from .data import Data, Sampler, SampleData
 from .dimension import BaseDimensional
 from . import integration as zintegrate, sample as zsample
 from .baseobject import BaseNumeric
-from .interfaces import ZfitModel, ZfitParameter, ZfitData
+from .interfaces import ZfitModel, ZfitParameter, ZfitData, ZfitSpace
 from .limits import Space, convert_to_space, no_multiple_limits, no_norm_range, supports
 from ..settings import ztypes
 from ..util import container as zcontainer, ztyping
@@ -31,6 +32,37 @@ from ..util.exception import (BasePDFSubclassingError, MultipleLimitsNotImplemen
                               ShapeIncompatibleError, SubclassingError, LimitsNotSpecifiedError, )
 
 _BaseModel_USER_IMPL_METHODS_TO_CHECK = {}
+
+
+# _BasePDF_USER_IMPL_METHODS_TO_CHECK = {}
+
+
+# def _BasePDF_register_check_support(has_support: bool):
+#     """Marks a method that the subclass either *has* to or *can't* use the `@supports` decorator.
+#
+#     Args:
+#         has_support (bool): If True, flags that it **requires** the `@supports` decorator. If False,
+#             flags that the `@supports` decorator is **not allowed**.
+#
+#     """
+#     if not isinstance(has_support, bool):
+#         raise TypeError("Has to be boolean.")
+#
+#     def register(func):
+#         """Register a method to be checked to (if True) *has* `support` or (if False) has *no* `support`.
+#
+#         Args:
+#             func (function):
+#
+#         Returns:
+#             function:
+#         """
+#         name = func.__name__
+#         _BaseModel_USER_IMPL_METHODS_TO_CHECK[name] = has_support
+#         func.__wrapped__ = _BasePDF_register_check_support
+#         return func
+#
+#     return register
 
 
 def _BaseModel_register_check_support(has_support: bool):
@@ -80,7 +112,8 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
     _inverse_analytic_integral = None
     _additional_repr = None
 
-    def __init__(self, obs: ztyping.ObsTypeInput, params: Union[Dict[str, ZfitParameter], None] = None,
+    def __init__(self, obs: ztyping.ObsTypeInput, normalized: Union[bool, ZfitSpace],
+                 params: Union[Dict[str, ZfitParameter], None] = None,
                  name: str = "BaseModel", dtype=ztypes.float,
                  **kwargs):
         """The base model to inherit from and overwrite `_unnormalized_pdf`.
@@ -93,6 +126,8 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
         """
         super().__init__(name=name, dtype=dtype, params=params, **kwargs)
         self._check_set_space(obs)
+        self._check_set_normalized(normalized)
+        self._norm_range = None
 
         self._integration = zcontainer.DotDict()
         self._integration.auto_numeric_integrator = self._DEFAULTS_integration.auto_numeric_integrator
@@ -218,6 +253,14 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
     def gradients(self, x: ztyping.XType, norm_range: ztyping.LimitsType, params: ztyping.ParamsTypeOpt = None):
         raise NotImplementedError
 
+    def _check_set_normalized(self, normalized):
+        if not normalized:
+            self._normalized = False
+        elif normalized is True:
+            self._normalized = True
+        else:
+            self.set_norm_range(normalized)
+
     def _check_input_norm_range(self, norm_range, caller_name="",
                                 none_is_error=False) -> Union[Space, bool]:
         """Convert to :py:class:`~zfit.Space`.
@@ -257,6 +300,39 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
 
         return self.convert_sort_space(limits=limits)
 
+    @property
+    def norm_range(self) -> Union[Space, None, bool]:
+        """Return the current normalization range. If None and the `obs`have limits, they are returned.
+
+        Returns:
+            :py:class:`~zfit.Space` or None: The current normalization range
+
+        """
+        norm_range = self._norm_range
+        if norm_range is None and self._normalized:
+            norm_range = self.space
+        return norm_range
+
+    @invalidates_cache
+    def set_norm_range(self, norm_range: ztyping.LimitsTypeInput):
+        """Set the normalization range (temporarily if used with contextmanager).
+
+        Args:
+            norm_range (tuple, :py:class:`~zfit.Space`):
+
+        """
+        norm_range = self._check_input_norm_range(norm_range=norm_range)
+
+        def setter(value):
+            self._norm_range = value
+
+        def getter():
+            return self._norm_range
+
+        return TemporarilySet(value=norm_range, setter=setter, getter=getter)
+
+    # Integrals
+
     def convert_sort_space(self, obs: ztyping.ObsTypeInput = None, axes: ztyping.AxesTypeInput = None,
                            limits: ztyping.LimitsTypeInput = None) -> Union[Space, None]:
         """Convert the inputs (using eventually `obs`, `axes`) to :py:class:`~zfit.Space` and sort them according to
@@ -278,8 +354,6 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
         if self_space is not None:
             space = space.with_obs_axes(self_space.get_obs_axes(), ordered=True, allow_subset=True)
         return space
-
-    # Integrals
 
     @_BaseModel_register_check_support(True)
     def _integrate(self, limits, norm_range):
@@ -1060,6 +1134,40 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
 
     def _check_input_params(self, *params):
         return tuple(convert_to_parameter(p) for p in params)
+
+    @_BaseModel_register_check_support(True)
+    def _normalization(self, limits):
+        raise NotImplementedError
+
+    def _hook_normalization(self, limits, name="_hook_normalization"):
+        return self._call_normalization(limits=limits, name=name)  # no _norm_* needed
+
+    def _single_hook_normalization(self, limits, name):  # TODO(Mayou36): add yield?
+        return self._hook_normalization(limits=limits, name=name)
+
+    def normalization(self, limits: ztyping.LimitsType, name: str = "normalization") -> ztyping.XType:
+        """Return the normalization of the function (usually the integral over `limits`).
+
+        Args:
+            limits (tuple, :py:class:`~zfit.Space`): The limits on where to normalize over
+            name (str):
+
+        Returns:
+            Tensor: the normalization value
+        """
+        limits = self._check_input_limits(limits=limits, caller_name=name)
+
+        return self._single_hook_normalization(limits=limits, name=name)
+
+    def _fallback_normalization(self, limits):
+        return self._hook_integrate(limits=limits, norm_range=False)
+
+    def _call_normalization(self, limits, name):
+        # TODO: caching? alternative
+        with self._name_scope(name, values=[limits]):
+            with suppress(NotImplementedError):
+                return self._normalization(limits=limits)
+            return self._fallback_normalization(limits)
 
 
 class SimpleModelSubclassMixin:

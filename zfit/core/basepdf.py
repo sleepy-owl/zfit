@@ -59,10 +59,9 @@ import warnings
 import tensorflow as tf
 
 from zfit import ztf
-from zfit.core.sample import extended_sampling
-from zfit.util.cache import invalidates_cache
+from .sample import extended_sampling
+from ..util.cache import invalidates_cache
 from .interfaces import ZfitPDF, ZfitParameter
-from .limits import Space
 from ..util import ztyping
 from ..util.container import convert_to_container
 from ..util.exception import (AlreadyExtendedPDFError,
@@ -74,53 +73,17 @@ from ..settings import ztypes, run
 
 func_simple = tf.function(autograph=False)  # TODO: how to properly?
 
-_BasePDF_USER_IMPL_METHODS_TO_CHECK = {}
-
-
-def _BasePDF_register_check_support(has_support: bool):
-    """Marks a method that the subclass either *has* to or *can't* use the `@supports` decorator.
-
-    Args:
-        has_support (bool): If True, flags that it **requires** the `@supports` decorator. If False,
-            flags that the `@supports` decorator is **not allowed**.
-
-    """
-    if not isinstance(has_support, bool):
-        raise TypeError("Has to be boolean.")
-
-    def register(func):
-        """Register a method to be checked to (if True) *has* `support` or (if False) has *no* `support`.
-
-        Args:
-            func (function):
-
-        Returns:
-            function:
-        """
-        name = func.__name__
-        _BasePDF_USER_IMPL_METHODS_TO_CHECK[name] = has_support
-        func.__wrapped__ = _BasePDF_register_check_support
-        return func
-
-    return register
-
 
 class BasePDF(ZfitPDF, BaseModel):
 
     def __init__(self, obs: ztyping.ObsTypeInput, params: Dict[str, ZfitParameter] = None, dtype: Type = ztypes.float,
                  name: str = "BasePDF",
                  **kwargs):
-        super().__init__(obs=obs, dtype=dtype, name=name, params=params, **kwargs)
+        super().__init__(obs=obs, dtype=dtype, name=name, params=params, normalized=True, **kwargs)
 
         self._yield = None
         self._temp_yield = None
-        self._norm_range = None
         self._normalization_value = None
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        cls._subclass_check_support(methods_to_check=_BasePDF_USER_IMPL_METHODS_TO_CHECK,
-                                    wrapper_not_overwritten=_BasePDF_register_check_support)
 
     def _func_to_integrate(self, x: ztyping.XType):
         return self.unnormalized_pdf(x)
@@ -161,37 +124,6 @@ class BasePDF(ZfitPDF, BaseModel):
         return part_numeric_int
 
     @property
-    def norm_range(self) -> Union[Space, None, bool]:
-        """Return the current normalization range. If None and the `obs`have limits, they are returned.
-
-        Returns:
-            :py:class:`~zfit.Space` or None: The current normalization range
-
-        """
-        norm_range = self._norm_range
-        if norm_range is None:
-            norm_range = self.space
-        return norm_range
-
-    @invalidates_cache
-    def set_norm_range(self, norm_range: ztyping.LimitsTypeInput):
-        """Set the normalization range (temporarily if used with contextmanager).
-
-        Args:
-            norm_range (tuple, :py:class:`~zfit.Space`):
-
-        """
-        norm_range = self._check_input_norm_range(norm_range=norm_range)
-
-        def setter(value):
-            self._norm_range = value
-
-        def getter():
-            return self._norm_range
-
-        return TemporarilySet(value=norm_range, setter=setter, getter=getter)
-
-    @property
     def _yield(self):
         """For internal use, the yield or None"""
         return self.params.get('yield')
@@ -203,40 +135,6 @@ class BasePDF(ZfitPDF, BaseModel):
             self._params.pop('yield', None)  # safely remove if still there
         else:
             self._params['yield'] = value
-
-    @_BasePDF_register_check_support(True)
-    def _normalization(self, limits):
-        raise NotImplementedError
-
-    def normalization(self, limits: ztyping.LimitsType, name: str = "normalization") -> ztyping.XType:
-        """Return the normalization of the function (usually the integral over `limits`).
-
-        Args:
-            limits (tuple, :py:class:`~zfit.Space`): The limits on where to normalize over
-            name (str):
-
-        Returns:
-            Tensor: the normalization value
-        """
-        limits = self._check_input_limits(limits=limits, caller_name=name)
-
-        return self._single_hook_normalization(limits=limits, name=name)
-
-    def _single_hook_normalization(self, limits, name):  # TODO(Mayou36): add yield?
-        return self._hook_normalization(limits=limits, name=name)
-
-    def _hook_normalization(self, limits, name="_hook_normalization"):
-        return self._call_normalization(limits=limits, name=name)  # no _norm_* needed
-
-    def _call_normalization(self, limits, name):
-        # TODO: caching? alternative
-        with self._name_scope(name, values=[limits]):
-            with suppress(NotImplementedError):
-                return self._normalization(limits=limits)
-            return self._fallback_normalization(limits)
-
-    def _fallback_normalization(self, limits):
-        return self._hook_integrate(limits=limits, norm_range=False)
 
     @abc.abstractmethod
     def _unnormalized_pdf(self, x):
@@ -276,7 +174,7 @@ class BasePDF(ZfitPDF, BaseModel):
         #                                  "it received on initialization."
         #                                  "Original Error: {}".format(error))
 
-    @_BasePDF_register_check_support(False)
+    @_BaseModel_register_check_support(False)
     def _pdf(self, x, norm_range):
         raise NotImplementedError
 
@@ -327,7 +225,7 @@ class BasePDF(ZfitPDF, BaseModel):
             pdf /= self._hook_normalization(limits=norm_range)
         return pdf
 
-    @_BasePDF_register_check_support(False)
+    @_BaseModel_register_check_support(False)
     def _log_pdf(self, x, norm_range):
         raise NotImplementedError
 

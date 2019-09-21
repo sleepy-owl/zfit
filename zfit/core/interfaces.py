@@ -6,8 +6,6 @@ from typing import Union, List, Dict, Callable, Tuple, Mapping, Iterable
 
 import tensorflow as tf
 
-
-
 import zfit
 from ..util import ztyping
 
@@ -291,6 +289,10 @@ class ZfitLoss(ZfitObject, ZfitDependentsMixin):
 class ZfitModel(ZfitNumeric, ZfitDimensional):
 
     @abc.abstractmethod
+    def func(self, x: ztyping.XType, name: str = "value") -> ztyping.XType:
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def update_integration_options(self, *args, **kwargs):  # TODO: handling integration properly
         raise NotImplementedError
 
@@ -373,11 +375,12 @@ class ZfitModel(ZfitNumeric, ZfitDimensional):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def set_norm_range(self, norm_range):
+        raise NotImplementedError
+
 
 class ZfitFunc(ZfitModel):
-    @abc.abstractmethod
-    def func(self, x: ztyping.XType, name: str = "value") -> ztyping.XType:
-        raise NotImplementedError
 
     @abc.abstractmethod
     def as_pdf(self):
@@ -393,10 +396,6 @@ class ZfitPDF(ZfitModel):
     @property
     @abc.abstractmethod
     def is_extended(self) -> bool:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def set_norm_range(self):
         raise NotImplementedError
 
     @abc.abstractmethod

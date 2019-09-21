@@ -18,7 +18,7 @@ class BaseFunc(BaseModel, ZfitFunc):
     def __init__(self, obs=None, dtype: typing.Type = ztypes.float, name: str = "BaseFunc",
                  params: typing.Any = None):
         """TODO(docs): explain subclassing"""
-        super().__init__(obs=obs, dtype=dtype, name=name, params=params)
+        super().__init__(obs=obs, dtype=dtype, name=name, params=params, normalized=False)
 
     def _func_to_integrate(self, x: ztyping.XType):
         return self.func(x=x)
