@@ -293,6 +293,10 @@ class ZfitModel(ZfitNumeric, ZfitDimensional):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def pdf(self, x: ztyping.XType, norm_range: ztyping.LimitsType = None, name: str = "model") -> ztyping.XType:
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def update_integration_options(self, *args, **kwargs):  # TODO: handling integration properly
         raise NotImplementedError
 
@@ -388,10 +392,6 @@ class ZfitFunc(ZfitModel):
 
 
 class ZfitPDF(ZfitModel):
-
-    @abc.abstractmethod
-    def pdf(self, x: ztyping.XType, norm_range: ztyping.LimitsType = None, name: str = "model") -> ztyping.XType:
-        raise NotImplementedError
 
     @property
     @abc.abstractmethod

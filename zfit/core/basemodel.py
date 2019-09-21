@@ -15,6 +15,7 @@ import tensorflow as tf
 from tensorflow_probability.python import mcmc as mc
 
 from zfit import ztf
+from ..settings import run
 from .sample import UniformSampleAndWeights
 from ..core.integration import Integration
 from .parameter import convert_to_parameter
@@ -1168,6 +1169,135 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
             with suppress(NotImplementedError):
                 return self._normalization(limits=limits)
             return self._fallback_normalization(limits)
+
+    @abc.abstractmethod
+    def _unnormalized_pdf(self, x):
+        raise NotImplementedError
+
+    def _call_unnormalized_pdf(self, x, name):
+        with self._name_scope(name, values=[x]):
+            # try:
+            return self._unnormalized_pdf(x)
+        # except ValueError as error:
+        #     raise ShapeIncompatibleError("Most probably, the number of obs the pdf was designed for"
+        #                                  "does not coincide with the `n_obs` from the `space`/`obs`"
+        #                                  "it received on initialization."
+        #                                  "Original Error: {}".format(error))
+
+    def _single_hook_unnormalized_pdf(self, x, component_norm_range, name):
+        return self._call_unnormalized_pdf(x=x, name=name)
+
+    def unnormalized_pdf(self, x: ztyping.XType, component_norm_range: ztyping.LimitsTypeInput = None,
+                         name: str = "unnormalized_pdf") -> ztyping.XType:
+        """PDF "unnormalized". Use `functions` for unnormalized pdfs. this is only for performance in special cases.
+
+        Args:
+            x (numerical): The value, have to be convertible to a Tensor
+            component_norm_range (:py:class:`~zfit.Space`): The normalization range for the components. Needed for
+            certain composition
+                pdfs.
+            name (str):
+
+        Returns:
+            :py:class:`tf.Tensor`: 1-dimensional :py:class:`tf.Tensor` containing the unnormalized pdf.
+        """
+        # if component_norm_range is None:
+        #     component_norm_range = self._get
+        with self._convert_sort_x(x) as x:
+            component_norm_range = self._check_input_norm_range(component_norm_range, caller_name=name,
+                                                                none_is_error=False)
+            return self._single_hook_unnormalized_pdf(x, component_norm_range, name)
+
+    @_BaseModel_register_check_support(False)
+    def _pdf(self, x, norm_range):
+        raise NotImplementedError
+
+    def pdf(self, x: ztyping.XTypeInput, norm_range: ztyping.LimitsTypeInput = None,
+            name: str = "model") -> ztyping.XType:
+        """Probability density function, normalized over `norm_range`.
+
+        Args:
+          x (numerical): `float` or `double` `Tensor`.
+          norm_range (tuple, :py:class:`~zfit.Space`): :py:class:`~zfit.Space` to normalize over
+          name (str): Prepended to names of ops created by this function.
+
+        Returns:
+          :py:class:`tf.Tensor` of type `self.dtype`.
+        """
+        norm_range = self._check_input_norm_range(norm_range, caller_name=name, none_is_error=True)
+        with self._convert_sort_x(x) as x:
+            value = self._single_hook_pdf(x=x, norm_range=norm_range, name=name)
+            if run.numeric_checks:
+                assert_op = ztf.check_numerics(value, message="Check if pdf output contains any NaNs of Infs")
+                assert_op = [assert_op]
+            else:
+                assert_op = []
+            with tf.control_dependencies(assert_op):
+                return ztf.to_real(value)
+
+    def _norm_pdf(self, x, norm_range, name='norm_pdf'):
+        return self._call_pdf(x=x, norm_range=norm_range, name=name)
+
+    def _hook_pdf(self, x, norm_range, name="_hook_pdf"):
+        return self._norm_pdf(x=x, norm_range=norm_range, name=name)
+
+    def _single_hook_pdf(self, x, norm_range, name):
+        return self._hook_pdf(x=x, norm_range=norm_range, name=name)
+
+    def _fallback_pdf(self, x, norm_range):
+        pdf = self._call_unnormalized_pdf(x, name="_call_unnormalized_pdf")
+        if norm_range.limits is not False:  # identity check!
+            pdf /= self._hook_normalization(limits=norm_range)
+        return pdf
+
+    def _call_pdf(self, x, norm_range, name):
+        with self._name_scope(name, values=[x, norm_range]):
+            with suppress(NotImplementedError):
+                return self._pdf(x, norm_range=norm_range)
+            with suppress(NotImplementedError):
+                return tf.exp(self._log_pdf(x=x, norm_range=norm_range))
+            return self._fallback_pdf(x=x, norm_range=norm_range)
+
+    @_BaseModel_register_check_support(False)
+    def _log_pdf(self, x, norm_range):
+        raise NotImplementedError
+
+    def _single_hook_log_pdf(self, x, norm_range, name):
+        return self._hook_log_pdf(x=x, norm_range=norm_range, name=name)
+
+    def log_pdf(self, x: ztyping.XType, norm_range: ztyping.LimitsType = None,
+                name: str = "log_pdf") -> ztyping.XType:
+        """Log probability density function normalized over `norm_range`.
+
+        Args:
+          x (numerical): `float` or `double` `Tensor`.
+          norm_range (tuple, :py:class:`~zfit.Space`): :py:class:`~zfit.Space` to normalize over
+          name (str): Prepended to names of ops created by this function.
+
+        Returns:
+          log_pdf: a `Tensor` of type `self.dtype`.
+        """
+        norm_range = self._check_input_norm_range(norm_range, caller_name=name)
+        with self._convert_sort_x(x) as x:
+            return self._single_hook_log_pdf(x=x, norm_range=norm_range, name=name)
+
+    def _hook_log_pdf(self, x, norm_range, name):
+        log_prob = self._norm_log_pdf(x=x, norm_range=norm_range, name=name)
+        return log_prob
+
+    def _fallback_log_pdf(self, x, norm_range):
+        return tf.math.log(self._hook_pdf(x=x, norm_range=norm_range))
+
+    def _call_log_pdf(self, x, norm_range, name):
+        with self._name_scope(name, values=[x, norm_range]):
+            with suppress(NotImplementedError):
+                return self._log_pdf(x=x, norm_range=norm_range)
+            with suppress(NotImplementedError):
+                return tf.math.log(self._pdf(x=x, norm_range=norm_range))
+            return self._fallback_log_pdf(x=x, norm_range=norm_range)
+
+    def _norm_log_pdf(self, x, norm_range, name='norm_log_pdf'):
+        return self._call_log_pdf(x=x, norm_range=norm_range, name=name)
 
 
 class SimpleModelSubclassMixin:
