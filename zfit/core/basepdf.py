@@ -83,10 +83,13 @@ class BasePDF(BaseModel, ZfitPDF):
         self._temp_yield = None
         self._normalization_value = None
 
-    def _func_to_integrate(self, x: ztyping.XType):
-        return self.unnormalized_pdf(x)
+    # def _func_to_integrate(self, x: ztyping.XType):
+    #     return self.unnormalized_pdf(x)
+    #
+    # def _func_to_sample_from(self, x):
+    #     return self.unnormalized_pdf(x)
 
-    def _func_to_sample_from(self, x):
+    def _func(self, x):
         return self.unnormalized_pdf(x)
 
     def _single_hook_integrate(self, limits, norm_range, name='hook_integrate'):

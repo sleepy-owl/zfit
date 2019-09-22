@@ -179,14 +179,12 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
             raise BasePDFSubclassingError("Method {} has not been correctly wrapped with @supports "
                                           "OR has been wrapped but it should not be".format(method_name))
 
-    # since subclasses can be funcs of pdfs, we need to now what to sample/integrate from
-    @abc.abstractmethod
     def _func_to_integrate(self, x: ztyping.XType) -> tf.Tensor:
-        raise NotImplementedError
+        return self.func(x)
 
     @abc.abstractmethod
     def _func_to_sample_from(self, x: ztyping.XType) -> Data:
-        raise NotImplementedError
+        return self.func(x)
 
     @property
     def space(self) -> "zfit.Space":
@@ -250,7 +248,7 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
         if mc_sampler is not None:
             self.integration.mc_sampler = mc_sampler
 
-    @abc.abstractmethod
+    @abc.abstractmethod  # TODO(Model): implement properly?
     def gradients(self, x: ztyping.XType, norm_range: ztyping.LimitsType, params: ztyping.ParamsTypeOpt = None):
         raise NotImplementedError
 
@@ -284,10 +282,7 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
                     raise ValueError("Normalization range `norm_range` has to be specified when calling {name} or"
                                      "a default normalization range has to be set. Currently, both are None"
                                      "".format(name=caller_name))
-            # else:
-            #     norm_range = False
-        # if norm_range is False and not convert_false:
-        #     return False
+
 
         return self.convert_sort_space(limits=norm_range)
 
@@ -1145,6 +1140,10 @@ class BaseModel(BaseNumeric, Cachable, BaseDimensional, ZfitModel):
 
     def _single_hook_normalization(self, limits, name):  # TODO(Mayou36): add yield?
         return self._hook_normalization(limits=limits, name=name)
+
+    @property
+    def normalized(self):
+        return self._normalized
 
     def normalization(self, limits: ztyping.LimitsType, name: str = "normalization") -> ztyping.XType:
         """Return the normalization of the function (usually the integral over `limits`).
