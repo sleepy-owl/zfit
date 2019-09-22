@@ -20,12 +20,6 @@ class BaseFunc(BaseModel, ZfitFunc):
         """TODO(docs): explain subclassing"""
         super().__init__(obs=obs, dtype=dtype, name=name, params=params, normalized=False)
 
-    def _func_to_integrate(self, x: ztyping.XType):
-        return self.func(x=x)
-
-    def _func_to_sample_from(self, x):
-        return self.func(x=x)
-
     # TODO(Mayou36): how to deal with copy properly?
     def copy(self, **override_params):
         new_params = self.params
@@ -44,7 +38,3 @@ class BaseFunc(BaseModel, ZfitFunc):
         """
         from zfit.core.operations import convert_func_to_pdf
         return convert_func_to_pdf(func=self)
-
-    def _check_input_norm_range_default(self, norm_range, caller_name="", none_is_error=True):  # TODO(Mayou36): default
-
-        return self._check_input_norm_range(norm_range=norm_range, caller_name=caller_name, none_is_error=none_is_error)

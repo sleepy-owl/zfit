@@ -12,15 +12,14 @@ import warnings
 import numpy as np
 import tensorflow as tf
 
-
-
 from zfit import ztf
+from ..core.basemodel import BaseModel
 from ..util.exception import DueToLazynessNotImplementedError
 from ..util.temporary import TemporarilySet
 from ..settings import ztypes
 from ..util import ztyping
 from ..core.limits import Space, ANY_LOWER, ANY_UPPER
-from ..core.basepdf import BasePDF
+from ..core.basepdf import BasePDF, PDFMixin
 
 infinity = mt.inf
 
@@ -47,7 +46,7 @@ CustomGaussOLD.register_analytic_integral(func=_gauss_integral_from_inf_to_inf,
                                           limits=Space.from_axes(limits=(-infinity, infinity), axes=(0,)))
 
 
-class Exponential(BasePDF):
+class ExponentialModel(BaseModel):
     _N_OBS = 1
 
     def __init__(self, lambda_, obs: ztyping.ObsTypeInput, name: str = "Exponential",
@@ -179,4 +178,8 @@ def _exp_integral_from_any_to_any(limits, params, model):
 
 
 limits = Space.from_axes(axes=0, limits=(ANY_LOWER, ANY_UPPER))
-Exponential.register_analytic_integral(func=_exp_integral_from_any_to_any, limits=limits)
+ExponentialModel.register_analytic_integral(func=_exp_integral_from_any_to_any, limits=limits)
+
+
+class Exponential(PDFMixin, ExponentialModel):
+    pass

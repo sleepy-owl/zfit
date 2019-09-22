@@ -16,13 +16,12 @@ import tensorflow_probability as tfp
 import tensorflow_probability.python.distributions as tfd
 import tensorflow as tf
 
-
-
 from zfit import ztf
-from zfit.util.exception import OverdefinedError
+from ..core.basemodel import BaseModel
+from ..util.exception import OverdefinedError
 from ..util import ztyping
 from ..settings import ztypes
-from ..core.basepdf import BasePDF
+from ..core.basepdf import BasePDF, PDFMixin
 from ..core.interfaces import ZfitParameter, ZfitData
 from ..core.limits import no_norm_range, supports
 from ..core.parameter import convert_to_parameter
@@ -52,12 +51,13 @@ def tfd_analytic_sample(n: int, dist: tfd.Distribution, limits: ztyping.ObsTypeI
     return sample
 
 
-class WrapDistribution(BasePDF):  # TODO: extend functionality of wrapper, like icdf
+class WrapDistributionModel(BaseModel):  # TODO: extend functionality of wrapper, like icdf
     """Baseclass to wrap tensorflow-probability distributions automatically.
 
     """
 
-    def __init__(self, distribution, dist_params, obs, params=None, dist_kwargs=None, dtype=ztypes.float, name=None,
+    def __init__(self, distribution, dist_params, obs, normalized, params=None, dist_kwargs=None, dtype=ztypes.float,
+                 name=None,
                  **kwargs):
         # Check if subclass of distribution?
         if dist_kwargs is None:
@@ -71,7 +71,7 @@ class WrapDistribution(BasePDF):  # TODO: extend functionality of wrapper, like 
         else:
             params = OrderedDict((k, convert_to_parameter(p)) for k, p in params.items())
 
-        super().__init__(obs=obs, dtype=dtype, name=name, params=params, **kwargs)
+        super().__init__(obs=obs, dtype=dtype, name=name, normalized=normalized, params=params, **kwargs)
 
         # self.tf_distribution = self.parameters['distribution']
         self._distribution = distribution
@@ -108,6 +108,10 @@ class WrapDistribution(BasePDF):  # TODO: extend functionality of wrapper, like 
 
     def _analytic_sample(self, n, limits: Space):
         return tfd_analytic_sample(n=n, dist=self.distribution, limits=limits)
+
+
+class WrapDistribution(PDFMixin, WrapDistributionModel):
+    pass
 
 
 # class KernelDensity(WrapDistribution):
@@ -171,11 +175,11 @@ class WrapDistribution(BasePDF):  # TODO: extend functionality of wrapper, like 
 #         return integral  # TODO: generalize for VectorSpaces
 
 
-class Gauss(WrapDistribution):
+class GaussModel(WrapDistributionModel):
     _N_OBS = 1
 
     def __init__(self, mu: ztyping.ParamTypeInput, sigma: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput,
-                 name: str = "Gauss"):
+                 normalized=True, name: str = "Gauss"):
         """Gaussian or Normal distribution with a mean (mu) and a standartdevation (sigma).
 
         The gaussian shape is defined as
@@ -200,25 +204,30 @@ class Gauss(WrapDistribution):
         params = OrderedDict((('mu', mu), ('sigma', sigma)))
         dist_params = dict(loc=mu, scale=sigma)
         distribution = tfp.distributions.Normal
-        super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, params=params, name=name + "_tfp")
+        super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, normalized=normalized,
+                         params=params, name=name + "_tfp")
 
 
-class ExponentialTFP(WrapDistribution):
-    _N_OBS = 1
-
-    def __init__(self, tau: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput, name: str = "Exponential"):
-        (tau,) = self._check_input_params(tau)
-        params = OrderedDict((('tau', tau),))
-        dist_params = dict(rate=tau)
-        distribution = tfp.distributions.Exponential
-        super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, params=params, name=name + "_tfp")
+class Gauss(PDFMixin, GaussModel):
+    pass
 
 
-class Uniform(WrapDistribution):
+# class ExponentialTFP(WrapDistribution):
+#     _N_OBS = 1
+#
+#     def __init__(self, tau: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput, name: str = "Exponential"):
+#         (tau,) = self._check_input_params(tau)
+#         params = OrderedDict((('tau', tau),))
+#         dist_params = dict(rate=tau)
+#         distribution = tfp.distributions.Exponential
+#         super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, params=params, name=name + "_tfp")
+
+
+class UniformModel(WrapDistributionModel):
     _N_OBS = 1
 
     def __init__(self, low: ztyping.ParamTypeInput, high: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput,
-                 name: str = "Uniform"):
+                 normalized=True, name: str = "Uniform"):
         """Uniform distribution which is constant between `low`, `high` and zero outside.
 
         Args:
@@ -231,14 +240,20 @@ class Uniform(WrapDistribution):
         params = OrderedDict((("low", low), ("high", high)))
         dist_params = dict(low=low, high=high)
         distribution = tfp.distributions.Uniform
-        super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, params=params, name=name + "_tfp")
+        super().__init__(distribution=distribution, dist_params=dist_params, obs=obs, normalized=normalized,
+                         params=params, name=name + "_tfp")
 
 
-class TruncatedGauss(WrapDistribution):
+class Uniform(PDFMixin, UniformModel):
+    pass
+
+
+class TruncatedGaussModel(WrapDistributionModel):
     _N_OBS = 1
 
     def __init__(self, mu: ztyping.ParamTypeInput, sigma: ztyping.ParamTypeInput, low: ztyping.ParamTypeInput,
-                 high: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput, name: str = "TruncatedGauss"):
+                 high: ztyping.ParamTypeInput, obs: ztyping.ObsTypeInput, normalized=True,
+                 name: str = "TruncatedGauss"):
         """Gaussian distribution that is 0 outside of `low`, `high`. Equivalent to the product of Gauss and Uniform.
 
         Args:
@@ -253,9 +268,9 @@ class TruncatedGauss(WrapDistribution):
         params = OrderedDict((("mu", mu), ("sigma", sigma), ("low", low), ("high", high)))
         distribution = tfp.distributions.TruncatedNormal
         dist_params = dict(loc=mu, scale=sigma, low=low, high=high)
-        super().__init__(distribution=distribution, dist_params=dist_params,
+        super().__init__(distribution=distribution, dist_params=dist_params, normalized=normalized,
                          obs=obs, params=params, name=name)
 
 
-if __name__ == '__main__':
-    exp1 = ExponentialTFP(tau=5., obs=['a'])
+class TruncatedGauss(PDFMixin, TruncatedGaussModel):
+    pass
