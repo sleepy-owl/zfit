@@ -1,5 +1,5 @@
 #  Copyright (c) 2020 zfit
-
+import pytest
 import tensorflow as tf
 
 import zfit
@@ -8,6 +8,7 @@ from zfit import z
 from zfit.core.testing import setup_function, teardown_function, tester
 
 
+@pytest.mark.skipif(zfit.run.get_graph_mode() is False)
 def test_modes():
     counts = 0
 
