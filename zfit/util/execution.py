@@ -9,7 +9,7 @@ from typing import List, Union, Optional
 
 import tensorflow as tf
 
-from .container import DotDict
+from dotmap import DotMap
 from .exception import IllegalInGraphModeError
 from .legacy import deprecated
 from .temporary import TemporarilySet
@@ -22,7 +22,7 @@ class RunManager:
     def __init__(self, n_cpu='auto'):
         """Handle the resources and runtime specific options. The `run` method is equivalent to `sess.run`"""
         self.MAX_CHUNK_SIZE = sys.maxsize
-        self.chunking = DotDict()
+        self.chunking = DotMap()
         self._cpu = []
         self._n_cpu = None
         self._inter_cpus = None
