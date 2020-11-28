@@ -1,5 +1,4 @@
 #  Copyright (c) 2020 zfit
-from collections import OrderedDict
 
 import numpy as np
 
@@ -28,29 +27,3 @@ result = minimizer.minimize(nll)
 
 # do the error calculations, here with minos
 param_errors, _ = result.errors()
-
-import dill
-import cloudpickle as clp
-
-dmps = {}
-
-
-def dump_recurse(obj):
-    obj_dict = obj.__dict__ if not isinstance(obj, dict) else obj
-    for k, val in obj_dict.items():
-        if k == '_cachers':
-            val = 'Nothing'
-        print(k, val)
-        if isinstance(val, (dict, OrderedDict)):
-            dmp1 = dump_recurse(val)
-        else:
-            dmp1 = clp.dumps(val)
-            # dmp1 = dill.dumps(val, recurse=True)
-        dmps[k] = dmp1
-    return dmps
-
-
-dump_recurse(gauss)
-dump_recurse(data)
-dump_recurse(nll)
-# dump_recurse(minimizer)
