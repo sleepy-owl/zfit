@@ -1,4 +1,4 @@
-#  Copyright (c) 2020 zfit
+#  Copyright (c) 2021 zfit
 
 import abc
 from abc import ABCMeta, abstractmethod
@@ -744,11 +744,6 @@ class ZfitLoss(ZfitObject, metaclass=ABCMeta):
 
     @abstractmethod
     def value(self) -> ztyping.NumericalTypeReturn:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def errordef(self) -> Union[float, int]:
         raise NotImplementedError
 
     @property
